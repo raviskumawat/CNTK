@@ -4590,6 +4590,16 @@ namespace CNTK
         CNTK_API virtual void OnCheckpointEnd(size_t /*checkpointIndex*/) {};
 
         ///
+        /// Optionally overridable callback that is invoked before each cross-validation minibatch.
+        ///
+        CNTK_API virtual void OnCrossValidationMinibatchStart() {};
+
+        ///
+        /// Optionally overridable callback that is invoked after each cross validation minibatch.
+        ///
+        CNTK_API virtual void OnCrossValidationMinibatchEnd(size_t /*validationIndex*/, double /*averageError*/, size_t /*numberOfSamples*/) {};
+
+        ///
         /// Optionally overridable callback that is invoked before each cross validation.
         ///
         CNTK_API virtual void OnCrossValidationStart(size_t /*validationIndex*/) {};
@@ -4597,7 +4607,7 @@ namespace CNTK
         ///
         /// Optionally overridable callback that is invoked after each cross validation.
         ///
-        CNTK_API virtual void OnCrossValidationEnd(size_t /*validationIndex*/, double /*averageError*/, size_t /*numberOfSamples*/, size_t /*numberOfMinibatches*/) {};
+        CNTK_API virtual void OnCrossValidationEnd(size_t /*validationIndex*/) {};
 
         ///
         /// Optionally overridable callback that is invoked with progress frequency.
@@ -4617,9 +4627,9 @@ namespace CNTK
         TrainingSession(const TrainingSession&) = delete; TrainingSession& operator=(const TrainingSession&) = delete; TrainingSession& operator=(TrainingSession&&) = delete; TrainingSession(TrainingSession&&) = delete;
 
         // Auxilary functions.
-        bool GetNextMinibatch(const MinibatchSourcePtr& source, std::unordered_map<Variable, ValuePtr>& minibatch, size_t maxMbSize, size_t workerRank, size_t numberOfWorkers, const DeviceDescriptor& computeDevice);
-        bool GetTrainingMinibatch(std::unordered_map<Variable, ValuePtr>& minibatch, size_t maxMbSize, const DeviceDescriptor& computeDevice);
-        bool GetCrossValidationMinibatch(std::unordered_map<Variable, ValuePtr>& minibatch, size_t maxMbSize, const DeviceDescriptor& computeDevice);
+        void GetNextMinibatch(const MinibatchSourcePtr& source, std::unordered_map<Variable, ValuePtr>& minibatch, size_t maxMbSize, size_t workerRank, size_t numberOfWorkers, const DeviceDescriptor& computeDevice);
+        void GetTrainingMinibatch(std::unordered_map<Variable, ValuePtr>& minibatch, size_t maxMbSize, const DeviceDescriptor& computeDevice);
+        void GetCrossValidationMinibatch(std::unordered_map<Variable, ValuePtr>& minibatch, size_t maxMbSize, const DeviceDescriptor& computeDevice);
 
         void RestoreFromCheckpoint();
         void SaveCheckpoint(size_t currentIndex);

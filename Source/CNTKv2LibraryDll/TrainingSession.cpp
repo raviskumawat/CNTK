@@ -123,7 +123,7 @@ namespace CNTK
             m_actions.push_back({ checkpointFrequencyInSamples, 0, 0,
                 [this](size_t currentIndex, const DeviceDescriptor&)
                 {
-                    SaveCheckpoint(currentIndex); 
+                    SaveCheckpoint(currentIndex);
                     // enable profiler after the first checkpoint
                     // This has effect only if the profiler is globally enabled by StartProfiler()
                     Microsoft::MSR::CNTK::ProfilerEnable(true);
@@ -159,11 +159,9 @@ namespace CNTK
                 ? m_maxNumberOfSamples - m_trainer->TotalNumberOfSamplesSeen()
                 : 0;
 
-            if (!GetTrainingMinibatch(minibatch, samplesLeft, computeDevice))
-            {
-                // There are no minibatches anymore, so training must stop.
-                break;
-            }
+            // Note that in case of distributed training we don't want to stop if the local minibatch
+            // is empty - it is possible that the other workers are still processing their minibatches.
+            GetTrainingMinibatch(minibatch, samplesLeft, computeDevice);
 
             // Train on the minibatch.
             OnMinibatchStart();
@@ -208,23 +206,19 @@ namespace CNTK
     void TrainingSession::CrossValidate(size_t currentIndex, const DeviceDescriptor& computeDevice)
     {
         std::unordered_map<Variable, ValuePtr> minibatch;
-        double accumulatedError = 0;
         double error;
-        size_t totalNumberOfSamples = 0;
-        size_t numberOfMinibatches = 0;
 
         auto checkpoint = m_crossValidationSource->GetCheckpointState();
         size_t sampleCount = 0;
-        while (GetCrossValidationMinibatch(minibatch, m_crossValidationSchedule[sampleCount], computeDevice))
+        while(GetCrossValidationMinibatch(minibatch, m_crossValidationSchedule[sampleCount], computeDevice), !minibatch.empty())
         {
+            OnCrossValidationMinibatchStart();
             error = m_trainer->TestMinibatch(minibatch, computeDevice, sampleCount);
-            accumulatedError += error;
-            totalNumberOfSamples += sampleCount;
-            numberOfMinibatches++;
+            OnCrossValidationMinibatchEnd(currentIndex, error, sampleCount);
         }
         m_crossValidationSource->RestoreFromCheckpoint(checkpoint);
 
-        OnCrossValidationEnd(currentIndex, accumulatedError / totalNumberOfSamples, totalNumberOfSamples, numberOfMinibatches);
+        OnCrossValidationEnd(currentIndex);
     }
 
     inline void TrainingSession::ReportProgress(size_t currentIndex)
@@ -232,7 +226,7 @@ namespace CNTK
         this->OnProgress(currentIndex);
     }
 
-    bool TrainingSession::GetTrainingMinibatch(std::unordered_map<Variable, ValuePtr>& minibatch, size_t maxMbSize, const DeviceDescriptor& computeDevice)
+    void TrainingSession::GetTrainingMinibatch(std::unordered_map<Variable, ValuePtr>& minibatch, size_t maxMbSize, const DeviceDescriptor& computeDevice)
     {
         size_t workerRank = m_workerRank, numberOfWorkers = m_numberOfWorkers;
 
@@ -245,31 +239,29 @@ namespace CNTK
 
         size_t mbSize = GetMinibatchSize();
         mbSize = std::min(mbSize, maxMbSize);
-        return GetNextMinibatch(m_trainingSource, minibatch, mbSize, workerRank, numberOfWorkers, computeDevice);
+        GetNextMinibatch(m_trainingSource, minibatch, mbSize, workerRank, numberOfWorkers, computeDevice);
     }
 
-    bool TrainingSession::GetCrossValidationMinibatch(std::unordered_map<Variable, ValuePtr>& minibatch, size_t maxMbSize, const DeviceDescriptor& computeDevice)
+    void TrainingSession::GetCrossValidationMinibatch(std::unordered_map<Variable, ValuePtr>& minibatch, size_t maxMbSize, const DeviceDescriptor& computeDevice)
     {
         // TODO: Support distributed cross-validation, when TestMinibatch supports it.
-        return GetNextMinibatch(m_crossValidationSource, minibatch, maxMbSize, 0, 1, computeDevice);
+        GetNextMinibatch(m_crossValidationSource, minibatch, maxMbSize, 0, 1, computeDevice);
     }
 
-    bool TrainingSession::GetNextMinibatch(const MinibatchSourcePtr& source, std::unordered_map<Variable, ValuePtr>& minibatch, size_t mbSize, size_t workerRank, size_t numberOfWorkers, const DeviceDescriptor& computeDevice)
+    void TrainingSession::GetNextMinibatch(const MinibatchSourcePtr& source, std::unordered_map<Variable, ValuePtr>& minibatch, size_t mbSize, size_t workerRank, size_t numberOfWorkers, const DeviceDescriptor& computeDevice)
     {
         minibatch.clear();
 
         if (mbSize == 0)
-            return false;
+            return;
 
         // TODO: is copy really necessary here?
         auto minibatchData = source->GetNextMinibatch(0 /*numberOfSequences*/, mbSize, numberOfWorkers, workerRank, computeDevice);
         if (minibatchData.empty())
-            return false;
+            return;
 
         for (auto v : m_modelInputToMinibatchSourceStream)
             minibatch.insert({ v.first, minibatchData[v.second].data });
-
-        return true;
     }
 
     void TrainingSession::RestoreFromCheckpoint(const std::wstring& checkpointFileName)
