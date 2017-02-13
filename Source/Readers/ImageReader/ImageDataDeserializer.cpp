@@ -40,7 +40,7 @@ public:
         if (!cvImage.data)
             RuntimeError("Cannot open file '%s'", imageSequence.m_path.c_str());
 
-        m_deserializer.PopulateSequenceData(cvImage, imageSequence.m_classId, sequenceId, result);
+        m_deserializer.PopulateSequenceData(cvImage, imageSequence.m_classId, sequenceId, imageSequence.m_key, result);
     }
 
 private:

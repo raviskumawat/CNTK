@@ -125,7 +125,7 @@ BOOST_AUTO_TEST_CASE(Base64WithWriteIds)
         shared_ptr<DataReader> reader = GetDataReader(testDataPath() + "/Config/ImageReaderSimple_Config.cntk",
             "Composite_Test", "reader", additionalParameters);
 
-        reader->StartMinibatchLoop(2 /*mbSize*/, 0, inputs->GetStreamDescriptions(), 4/*epochSize*/);
+        reader->StartMinibatchLoop(2 /*mbSize*/, 0, inputs->GetStreamDescriptions(), 8/*epochSize*/);
         for (auto index = 0; reader->GetMinibatch(*inputs); index++)
         {
             for (const auto s : inputs->GetInput(L"features").pMBLayout->GetAllSequences())
@@ -139,10 +139,10 @@ BOOST_AUTO_TEST_CASE(Base64WithWriteIds)
     {
         multiset<string> expectedKeys
         {
-            "image0",
-            "image1",
-            "image2",
-            "image3",
+            "image0", "image0",
+            "image1", "image1",
+            "image2", "image2",
+            "image3", "image3"
         };
 
         std::vector<std::wstring> additionalParameters
@@ -160,15 +160,15 @@ BOOST_AUTO_TEST_CASE(Base64WithWriteIds)
     {
         multiset<string> expectedKeys
         {
-            "0",
-            "1",
-            "2",
-            "3",
+            "0", "0",
+            "1", "1",
+            "2", "2",
+            "3", "3"
         };
 
         std::vector<std::wstring> additionalParameters
         {
-            L"MapFile=\"$RootDir$/Base64ImageReaderSimple_map.txt.txt\"",
+            L"MapFile=\"$RootDir$/Base64ImageReaderSimple_map.txt\"",
             L"DeserializerType=\"Base64ImageDeserializer\""
         };
 
