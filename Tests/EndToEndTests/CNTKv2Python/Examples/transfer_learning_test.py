@@ -49,6 +49,9 @@ def test_transfer_learning(device_id):
     num_train_images = 10
     num_test_images = 2
 
+    node_outputs = get_node_outputs(load_model(model_file))
+    assert len(node_outputs) == 83
+
     output_file = os.path.join(base_path, "tl_output.txt")
     trained_model = train_model(model_file, feature_node_name, last_hidden_node_name,
                                 image_width, image_height, num_channels, num_classes, map_file,
