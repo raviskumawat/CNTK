@@ -159,7 +159,7 @@ MBLayoutPtr SequencePacker::PackDenseStream(const StreamBatch& batch, size_t str
             continue;
         }
 
-        const auto& sequence = batch[sequenceInfos[i].seqId];
+        const auto& sequence = batch[sequenceInfo.seqId];
         size_t numSamples = sequence->m_numberOfSamples;
         assert(numSamples == sequenceInfo.GetNumTimeSteps());
 
@@ -265,26 +265,14 @@ MBLayoutPtr SequencePacker::PackSparseStream(const StreamBatch& batch, size_t st
     sort(sequenceInfos.begin(), sequenceInfos.end(),
         [](const MBLayout::SequenceInfo& a, const MBLayout::SequenceInfo& b){ return a.s < b.s; });
 
-    std::map<size_t, size_t> infoIdToBatchIndex;
-    for (const auto& s : sequenceInfos)
-    {
-        if (s.seqId == GAP_SEQUENCE_ID)
-            continue;
-        size_t index =
-            std::find_if(batch.begin(), batch.end(), [&s](const SequenceDataPtr& d) { return s.seqId == d->m_key.m_sequence; }) - batch.begin();
-        assert(index < batch.size());
-        infoIdToBatchIndex[s.seqId] = index;
-    }
-
     // Iterate over the all time steps in the layout (total number of samples/columns 
     // in a parallel sequence), traversing the layout in horizontal direction.
     for (auto timeStep = 0; timeStep < pMBLayout->GetNumTimeSteps(); ++timeStep)
     {
         // For each time step, iterate over all sequences in the minibatch,
         // traversing the layout in vertical direction.
-        for (size_t i = 0; i < sequenceInfos.size(); ++i)
+        for (const auto& sequenceInfo : sequenceInfos)
         {
-            const auto& sequenceInfo = sequenceInfos[i];
             // skip the sequence if it does not intersect with the time step
             if (timeStep < sequenceInfo.tBegin || timeStep >= sequenceInfo.tEnd)
             {
@@ -294,21 +282,20 @@ MBLayoutPtr SequencePacker::PackSparseStream(const StreamBatch& batch, size_t st
             // store the offset of the current column )...
             sparseColumnIndices.push_back(columnOffset);
 
-            if (sequenceInfo.seqId == GAP_SEQUENCE_ID)
+            auto seqId = sequenceInfo.seqId;
+            if (seqId == GAP_SEQUENCE_ID)
             {
                 continue;
             }
 
             // compute the index of the sample inside the sequence.
             size_t sampleIndex = timeStep - sequenceInfo.tBegin;
-            size_t index = infoIdToBatchIndex[sequenceInfo.seqId];
-            const auto& sequence = batch[index];
-            assert(sequenceInfo.seqId == sequence->m_key.m_sequence);
-            
+            const auto& sequence = batch[seqId];
+
             // make sure the index less than the sequence length in samples.
             assert(sampleIndex < sequence->m_numberOfSamples);
 
-            auto& sequenceOffset = sequenceOffsets[index];
+            auto& sequenceOffset = sequenceOffsets[seqId];
             SparseSequenceDataPtr sparseSequence = static_pointer_cast<SparseSequenceData>(sequence);
             IndexType nnz = sparseSequence->m_nnzCounts[sampleIndex];
 
